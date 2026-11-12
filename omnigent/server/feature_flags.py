@@ -52,6 +52,7 @@ class Feature(StrEnum):
     PROJECT_REPOSITORY_CREATION = "project_repository_creation"
     WORKSPACE_DIRECT_ACCESS = "workspace_direct_access"
     WORKSPACE_API_SERVER_ACCESS = "workspace_api_server_access"
+    QUICK_PICK_PALETTE = "quick_pick_palette"
 
 
 @dataclass(frozen=True)
@@ -261,6 +262,12 @@ FEATURE_DEFINITIONS: tuple[FeatureDefinition, ...] = (
         owner="server",
         review_by_release="0.27.0",
         frontend_visible=False,
+    ),
+    FeatureDefinition(
+        feature=Feature.QUICK_PICK_PALETTE,
+        description="Run the ⌘K command palette on the fuzzy-matching QuickPick list",
+        owner="web",
+        review_by_release="0.24.0",
     ),
 )
 
