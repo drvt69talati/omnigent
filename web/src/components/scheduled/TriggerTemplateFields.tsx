@@ -94,6 +94,8 @@ export function TriggerTemplateFields({
   taskSessionMode = "new",
   workflowField = null,
   instructionsAreDetails = false,
+  instructionsMaxChars = MAX_INSTRUCTIONS_CHARS,
+  instructionsUpgradeHint = null,
 }: {
   source: TriggerSource;
   fields: TriggerFields;
@@ -108,6 +110,10 @@ export function TriggerTemplateFields({
   workflowField?: ReactNode;
   /** A workflow was chosen, so the instructions are each run's details. */
   instructionsAreDetails?: boolean;
+  /** From triggerMessageBudget: smaller where the server or host is older. */
+  instructionsMaxChars?: number;
+  /** What to update for the full budget, shown with the length error. */
+  instructionsUpgradeHint?: string | null;
 }) {
   const template = TRIGGER_TEMPLATES[source];
   const Icon = template.icon;
@@ -121,10 +127,10 @@ export function TriggerTemplateFields({
   const scope = triggerScope(source, fields.event);
   const conditionFields = triggerConditionFields(source, fields.event);
   const scopeEntries = triggerScopeEntries(source, fields);
-  const instructionsTooLong = fields.instructions.trim().length > MAX_INSTRUCTIONS_CHARS;
-  const instructionsTooLongMessage = `Keep instructions to ${MAX_INSTRUCTIONS_CHARS.toLocaleString("en-US")} characters or fewer so each ${
+  const instructionsTooLong = fields.instructions.trim().length > instructionsMaxChars;
+  const instructionsTooLongMessage = `Keep instructions to ${instructionsMaxChars.toLocaleString("en-US")} characters or fewer so each ${
     taskSessionMode === "continue" ? "message to the task session" : "session's first message"
-  } has room for the item.`;
+  } has room for the item.${instructionsUpgradeHint ? ` ${instructionsUpgradeHint}` : ""}`;
   const [activeSection, setActiveSection] = useState<"trigger" | "instructions">("trigger");
   const fullTriggerDescription = triggerEventDescription(source, fields.event);
   const firstSentenceEnd = fullTriggerDescription.indexOf(". ");
