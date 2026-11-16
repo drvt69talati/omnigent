@@ -1723,6 +1723,14 @@ def test_scheduled_task_grants_are_scoped_to_the_workspace(
         assert store.resolve_scheduled_task_access(["alice@example.com"], task_id) == 1
 
 
+def _minimal_store(**methods: object) -> PermissionStore:
+    """A store implementing only the abstract methods, as no-ops unless given in *methods*."""
+    stubs: dict[str, object] = {
+        name: lambda self, *args, **kwargs: None for name in PermissionStore.__abstractmethods__
+    }
+    return type("MinimalPermissionStore", (PermissionStore,), {**stubs, **methods})("unused://")
+
+
 def test_store_without_scheduled_task_grants_keeps_safe_defaults() -> None:
     """A subclass without scheduled task grants still instantiates and holds or grants none."""
     scheduled_task_methods = {
@@ -1733,12 +1741,7 @@ def test_store_without_scheduled_task_grants_keeps_safe_defaults() -> None:
         "delete_for_scheduled_task",
     }
     assert not scheduled_task_methods & PermissionStore.__abstractmethods__
-    minimal_store_class = type(
-        "MinimalPermissionStore",
-        (PermissionStore,),
-        {name: lambda self, *args, **kwargs: None for name in PermissionStore.__abstractmethods__},
-    )
-    minimal = minimal_store_class("unused://")
+    minimal = _minimal_store()
 
     assert minimal.supports_scheduled_task_grants is False
     with pytest.raises(OmnigentError) as caught:
@@ -1748,3 +1751,34 @@ def test_store_without_scheduled_task_grants_keeps_safe_defaults() -> None:
     assert minimal.list_for_scheduled_task("task") == ([], None)
     assert minimal.resolve_scheduled_task_access(["alice@example.com"], "task") is None
     assert minimal.delete_for_scheduled_task("task") == 0
+
+
+def test_direct_session_reads_default_to_the_stores_reads() -> None:
+    """A store whose reads are already direct needs no overrides; ``__public__`` stays public."""
+    grant = SessionPermission("alice@example.com", "conv", LEVEL_READ)
+    reads: list[tuple[object, ...]] = []
+
+    def get(self: PermissionStore, user_id: str, conversation_id: str) -> SessionPermission:
+        reads.append(("get", user_id, conversation_id))
+        return grant
+
+    def list_for_session(
+        self: PermissionStore, conversation_id: str, *, limit: int, after_user_id: str | None
+    ) -> tuple[list[SessionPermission], str | None]:
+        reads.append(("list", conversation_id, limit, after_user_id))
+        return [grant], "alice@example.com"
+
+    store = _minimal_store(get=get, list_for_session=list_for_session)
+
+    assert store.get_direct("alice@example.com", "conv") is grant
+    assert store.list_direct_for_session("conv", limit=5, after_user_id="aaron@example.com") == (
+        [grant],
+        "alice@example.com",
+    )
+    assert store.list_direct_for_session("conv", limit=5) == ([grant], "alice@example.com")
+    assert reads == [
+        ("get", "alice@example.com", "conv"),
+        ("list", "conv", 5, "aaron@example.com"),
+        ("list", "conv", 5, None),
+    ]
+    assert store.public_grantees() == frozenset({RESERVED_USER_PUBLIC})
